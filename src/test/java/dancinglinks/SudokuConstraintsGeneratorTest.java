@@ -13,7 +13,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.util.Collection;
 import java.util.List;
 
-public class SudokuContraintsGeneratorTest {
+public class SudokuConstraintsGeneratorTest {
 
   @Nested
   public class Size2x2 {

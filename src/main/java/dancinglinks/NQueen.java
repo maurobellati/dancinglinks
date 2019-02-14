@@ -176,7 +176,7 @@ public class NQueen {
     }
 
     private Cell parseRowName(final String input) {
-      String[] rowColumn = input.split(".");
+      String[] rowColumn = input.split("\\.");
       return new Cell(parseInt(rowColumn[0]),
                       parseInt(rowColumn[1]));
 
@@ -246,10 +246,9 @@ public class NQueen {
   }
 
   public List<NQueen> solve() {
-
     ConstraintsGenerator constraintsGenerator = new ConstraintsGenerator(size, existingValues);
     List<String> constraints = constraintsGenerator.generate();
-    List<Solver.Solution> solutions = MatrixBuilder.withContraintsLines(constraints).solve(Solver.ColumnSelector.FIRST, false);
+    List<Solver.Solution> solutions = MatrixBuilder.withConstraintsLines(constraints).solve(Solver.ColumnSelector.FIRST, false);
 
     return solutions.stream()
                     .map(it -> fromSolution(it, constraintsGenerator::parseRowName))

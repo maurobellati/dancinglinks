@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-public class NQueenContraintsGeneratorTest {
+public class NQueenConstraintsGeneratorTest {
 
   @Nested
   public class Size3x3 {

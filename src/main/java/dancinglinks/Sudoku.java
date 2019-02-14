@@ -154,10 +154,10 @@ public class Sudoku {
     }
 
     private String generate(final Cell cell) {
-      Stream<String> cellContraints = cellConstraintFormaters.stream().map(it -> it.apply(cell));
+      Stream<String> cellConstraints = cellConstraintFormaters.stream().map(it -> it.apply(cell));
 
       return concat(Stream.of(formatRowName(cell)),
-                    cellContraints).collect(joining(" "));
+                    cellConstraints).collect(joining(" "));
 
     }
 
@@ -262,7 +262,7 @@ public class Sudoku {
   public List<Sudoku> solve() {
     ConstraintsGenerator constraintsGenerator = new ConstraintsGenerator(size, existingValues.values(), alphabeth);
     List<String> constraints = constraintsGenerator.generate();
-    List<Solver.Solution> solutions = MatrixBuilder.withContraintsLines(constraints).solve();
+    List<Solver.Solution> solutions = MatrixBuilder.withConstraintsLines(constraints).solve();
 
     return solutions.stream()
                     .map(it -> fromSolution(it, constraintsGenerator::parseRowName))

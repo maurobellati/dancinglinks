@@ -3,7 +3,7 @@ package dancinglinks;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Lists.newLinkedList;
-import static com.google.common.collect.Maps.newHashMap;
+import static com.google.common.collect.Maps.newLinkedHashMap;
 import static java.lang.System.lineSeparator;
 import static java.util.Objects.nonNull;
 import static java.util.stream.Collectors.joining;
@@ -21,11 +21,9 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 public class Matrix {
-
   @Data
   @EqualsAndHashCode(of = "id")
   public static class Node {
-
     private Integer columnCount;
     private Node columnHeader;
     private Node down;
@@ -49,6 +47,16 @@ public class Matrix {
       rowHeader = this;
       columnHeader = this;
       columnCount = 0;
+    }
+
+    public List<Node> getAll(Function<Node, Node> next) {
+      List<Node> result = newLinkedList();
+      Node node = next.apply(this);
+      while (!node.equals(this)) {
+        result.add(node);
+        node = next.apply(node);
+      }
+      return result;
     }
 
     @Override
@@ -120,40 +128,58 @@ public class Matrix {
       Node thisNext = getNext.apply(this);
       setNext.accept(value, thisNext);
       setNext.accept(this, value);
-
       setPrevious.accept(thisNext, value);
       setPrevious.accept(value, this);
     }
   }
 
-  private final Map<String, Node> nameToColumnMap = newHashMap();
-  private final Node root;
+  private final Map<String, Node> allColumns = newLinkedHashMap();
+  private final Map<String, Node> primaryColumns = newLinkedHashMap();
+  private final Node primaryRoot;
+  private final Map<String, Node> secondaryColumns = newLinkedHashMap();
+  private final Node secondaryRoot;
 
-  public Matrix(final List<String> columnNames) {
-    root = new Node("--");
+  public Matrix(final List<String> primaryColumnNames, final List<String> secondaryColumnNames) {
+    primaryRoot = new Node("--");
+    secondaryRoot = new Node("|");
 
-    columnNames.forEach(name -> {
+    primaryColumnNames.forEach(name -> {
       Node columnHeader = new Node(name);
-      root.getLeft().insertRight(columnHeader);
-      nameToColumnMap.put(name, columnHeader);
+      primaryRoot.getLeft().insertRight(columnHeader);
+      primaryColumns.put(name, columnHeader);
     });
+    secondaryColumnNames.forEach(name -> {
+      Node columnHeader = new Node(name);
+      secondaryRoot.getLeft().insertRight(columnHeader);
+      secondaryColumns.put(name, columnHeader);
+    });
+
+    allColumns.putAll(primaryColumns);
+    allColumns.putAll(secondaryColumns);
   }
 
   public void addRow(final String rowName, final List<String> columnNames) {
     Node rowHeader = new Node(rowName);
-    root.getUp().insertDown(rowHeader);
-
+    primaryRoot.getUp().insertDown(rowHeader);
     columnNames.forEach(columnName -> {
-      checkState(nameToColumnMap.containsKey(columnName), "Column %s does not exist", columnName);
-
+      Node columnHeader = allColumns.get(columnName);
+      checkState(columnHeader != null, "Column %s does not exist", columnName);
       Node node = new Node();
       rowHeader.getLeft().insertRight(node);
-      nameToColumnMap.get(columnName).getUp().insertDown(node);
+      columnHeader.getUp().insertDown(node);
     });
   }
 
+  public final List<Node> getPrimaryColumns() {
+    return newLinkedList(primaryColumns.values());
+  }
+
+  public final List<Node> getSecondaryColumns() {
+    return newLinkedList(secondaryColumns.values());
+  }
+
   public boolean isEmpty() {
-    return getUncoveredColumns().isEmpty();
+    return getUncoveredPrimaryColumns().isEmpty();
   }
 
   public List<Solver.Solution> solve(final Solver.ColumnSelector columnSelector, final boolean findOneSolution) {
@@ -166,16 +192,12 @@ public class Matrix {
 
   public String toString() {
     StringBuilder result = new StringBuilder();
-
     String separator = " ";
-    result.append(root).append(separator);
-
-    Collection<Node> columnHeaders = getUncoveredColumns();
+    result.append(primaryRoot).append(separator);
+    Collection<Node> columnHeaders = allColumns.values();
     result.append(columnHeaders.stream().map(Objects::toString).collect(joining(separator))).append(lineSeparator());
-
     for (Node rowHeader : getUncoveredRows()) {
       result.append(rowHeader).append(separator);
-
       Node node = rowHeader.getRight();
       for (Node columnHeader : columnHeaders) {
         if (node.getColumnHeader().equals(columnHeader)) {
@@ -186,61 +208,51 @@ public class Matrix {
         }
         result.append(separator);
       }
-
       result.append(lineSeparator());
     }
-
     return result.toString();
   }
 
   void coverColumn(final Node input) {
-    checkArgument(getUncoveredColumns().contains(input),
-                  "Column %s is already covered", input);
-
+    checkArgument(getUncoveredColumns().contains(input), "Column %s is already covered", input);
     input.unlinkLR();
-    getNodesAfter(input, Node::getDown).forEach(this::coverRow);
-  }
-
-  List<Node> getNodesAfter(final Node start, Function<Node, Node> next) {
-    List<Node> result = newLinkedList();
-
-    Node node = next.apply(start);
-    while (!node.equals(start)) {
-      result.add(node);
-      node = next.apply(node);
-    }
-
-    return result;
+    input.getAll(Node::getDown).forEach(this::coverRow);
   }
 
   List<Node> getUncoveredColumns() {
-    return getNodesAfter(root, Node::getRight);
+    List<Node> result = newLinkedList();
+    result.addAll(getUncoveredPrimaryColumns());
+    result.addAll(getUncoveredSecondaryColumns());
+    return result;
   }
 
   List<Node> getUncoveredNodes() {
-    return getUncoveredColumns().stream()
-                                .flatMap(column -> getNodesAfter(column, Node::getDown).stream())
-                                .collect(toList());
+    return getUncoveredColumns().stream().flatMap(column -> column.getAll(Node::getDown).stream()).collect(toList());
+  }
+
+  List<Node> getUncoveredPrimaryColumns() {
+    return primaryRoot.getAll(Node::getRight);
   }
 
   List<Node> getUncoveredRows() {
-    return getNodesAfter(root, Node::getDown);
+    return primaryRoot.getAll(Node::getDown);
+  }
+
+  List<Node> getUncoveredSecondaryColumns() {
+    return secondaryRoot.getAll(Node::getRight);
   }
 
   void uncoverColumn(final Node input) {
-    checkArgument(!getUncoveredColumns().contains(input),
-                  "Column %s is not covered", input);
-
-    getNodesAfter(input, Node::getUp).forEach(this::uncoverRow);
+    checkArgument(!getUncoveredColumns().contains(input), "Column %s is not covered", input);
+    input.getAll(Node::getUp).forEach(this::uncoverRow);
     input.relinkLR();
   }
 
   private void coverRow(final Node input) {
-    getNodesAfter(input, Node::getRight).forEach(Node::unlinkUD);
+    input.getAll(Node::getRight).forEach(Node::unlinkUD);
   }
 
   private void uncoverRow(final Node input) {
-    getNodesAfter(input, Node::getLeft).forEach(Node::relinkUD);
+    input.getAll(Node::getLeft).forEach(Node::relinkUD);
   }
-
 }
