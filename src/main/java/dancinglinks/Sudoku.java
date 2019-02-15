@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 @EqualsAndHashCode(of = {"size", "alphabeth", "existingValues"})
-public class Sudoku {
+public class Sudoku implements Solvable<Sudoku> {
   @Value
   @AllArgsConstructor
   public static class Cell implements Comparable<Cell> {
@@ -54,7 +54,6 @@ public class Sudoku {
     @Override
     public int compareTo(final Cell other) {
       checkNotNull(other);
-
       return ComparisonChain.start()
                             .compare(coordinates, other.getCoordinates())
                             .compare(value, other.getValue())
@@ -91,6 +90,7 @@ public class Sudoku {
       }
 
       allPossibleCells = newLinkedList();
+
       rangeClosed(1, size)
         .forEach(rowIndex ->
                    rangeClosed(1, size)
@@ -98,6 +98,10 @@ public class Sudoku {
                                 rangeClosed(1, size)
                                   .forEach(number ->
                                              allPossibleCells.add(new Cell(rowIndex, columnIndex, alphabeth.get(number - 1))))));
+    }
+
+    private static boolean isPerfectSquare(final int input) {
+      return isMathematicalInteger(sqrt(input));
     }
 
     public Cell parseRowName(final String name) {
@@ -255,18 +259,19 @@ public class Sudoku {
     return result;
   }
 
-  private static boolean isPerfectSquare(final int input) {
-    return isMathematicalInteger(sqrt(input));
-  }
-
-  public List<Sudoku> solve() {
+  public List<Sudoku> solve(final Solver.Options options) {
     ConstraintsGenerator constraintsGenerator = new ConstraintsGenerator(size, existingValues.values(), alphabeth);
-    List<String> constraints = constraintsGenerator.generate();
-    List<Solver.Solution> solutions = MatrixBuilder.withConstraintsLines(constraints).solve();
-
-    return solutions.stream()
-                    .map(it -> fromSolution(it, constraintsGenerator::parseRowName))
-                    .collect(toList());
+    Function<Solution, Sudoku> solutionParser = solution -> new Sudoku(size,
+                                                                       solution.getRowNames()
+                                                                               .stream()
+                                                                               .map(constraintsGenerator::parseRowName)
+                                                                               .collect(toList()),
+                                                                       alphabeth);
+    return MatrixBuilder.withConstraintsLines(constraintsGenerator.generate())
+                        .solve(options)
+                        .stream()
+                        .map(solutionParser)
+                        .collect(toList());
   }
 
   public Object toPrettyString() {
@@ -287,17 +292,6 @@ public class Sudoku {
                       .add("size", size)
                       .add("matrix", toPrettyString())
                       .toString();
-  }
-
-  private Sudoku fromSolution(final Solver.Solution solution, final Function<String, Cell> cellParser) {
-    int rowCount = solution.getRowNames().size();
-    checkState(isPerfectSquare(rowCount), "Solution row count (%s) is expected to be the square of the size", rowCount);
-    return new Sudoku(size,
-                      solution.getRowNames()
-                              .stream()
-                              .map(cellParser)
-                              .collect(toList()),
-                      alphabeth);
   }
 
   private Stream<Optional<Cell>> getRow(final int rowIndex) {

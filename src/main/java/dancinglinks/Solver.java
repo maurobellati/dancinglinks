@@ -6,13 +6,16 @@ import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Stream.concat;
 
-import com.google.common.base.MoreObjects;
 import dancinglinks.Matrix.Node;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.NonNull;
 import lombok.Value;
 
+import java.io.PrintStream;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -34,66 +37,60 @@ public class Solver {
   }
 
   @Value
-  public static class Solution {
-    private final List<List<Node>> nodes;
+  @Builder
+  public static class Options {
 
-    public List<List<String>> getCoveredColumnNames() {
-      return nodes.stream()
-                  .map(rowNodes ->
-                         rowNodes.stream()
-                                 .map(Node::getColumnHeader)
-                                 .map(Node::getLabel)
-                                 .collect(toList()))
-                  .collect(toList());
+    @Builder.Default
+    @NonNull
+    final ColumnSelector columnSelector = ColumnSelector.SMALLER;
+
+    final Integer limit;
+
+    final PrintStream logger;
+
+    public static Options withLimit(final int limit) {
+      return builder().limit(limit).build();
     }
 
-    public List<String> getRowNames() {
-      return nodes.stream()
-                  .map(list -> list.get(0).getRowHeader().getLabel())
-                  .collect(toList());
+    public Optional<Integer> getLimit() {
+      return Optional.ofNullable(limit);
     }
 
-    @Override
-    public String toString() {
-      return MoreObjects.toStringHelper(this)
-                        .add("nodes", nodes)
-                        .add("rowNames", getRowNames())
-                        .add("coveredColumnNames", getCoveredColumnNames())
-                        .toString();
+    public Optional<PrintStream> getLogger() {
+      return Optional.ofNullable(logger);
     }
   }
 
-  private final ColumnSelector columnSelector;
-  private final boolean findOneSolution;
   private final Matrix matrix;
+  private final Options options;
   private final List<Solution> solutions = newArrayList();
 
   public Solver(final Matrix matrix,
-                final ColumnSelector columnSelector,
-                final boolean findOneSolution) {
+                final Options options) {
     this.matrix = matrix;
-    this.columnSelector = columnSelector;
-    this.findOneSolution = findOneSolution;
+    this.options = options;
   }
 
   public List<Solution> solve() {
+    log("Solving with %s", options);
     solutions.clear();
     search(newArrayList());
     return copyOf(solutions);
   }
 
-  private Solver.Solution getSolution(final List<Node> progress) {
+  private Solution getSolution(final List<Node> progress) {
 
-    return new Solver.Solution(progress.stream()
-                                       .map(node -> concat(Stream.of(node),
-                                                           node.getAll(Node::getRight).stream())
-                                         .filter(it -> !it.isHeader())
-                                         .collect(toList()))
-                                       .collect(toList()));
+    return new Solution(progress.stream()
+                                .map(node -> concat(Stream.of(node),
+                                                    node.getAll(Node::getRight).stream())
+                                  .filter(it -> !it.isHeader())
+                                  .collect(toList()))
+                                .collect(toList()));
   }
 
   private void log(final String message, final Object... args) {
-    //        System.out.printf(message + "%n", args);
+    options.getLogger()
+           .ifPresent(out -> out.printf(message + "%n", args));
   }
 
   private void saveSolution(final List<Node> progress) {
@@ -110,7 +107,7 @@ public class Solver {
     }
     log("%s: available columns: %s | %s", level, matrix.getUncoveredPrimaryColumns(), matrix.getUncoveredSecondaryColumns());
 
-    Node column = columnSelector.select(matrix.getUncoveredColumns());
+    Node column = options.getColumnSelector().select(matrix.getUncoveredPrimaryColumns());
     matrix.coverColumn(column);
     log("%s: choosed and covered column %s", level, column);
 
@@ -125,7 +122,10 @@ public class Solver {
       }
 
       boolean found = search(progress);
-      if (found && findOneSolution) {
+      Boolean reachedSolutionLimit = options.getLimit()
+                                            .map(it -> it <= solutions.size())
+                                            .orElse(false);
+      if (found && reachedSolutionLimit) {
         return true;
       }
 

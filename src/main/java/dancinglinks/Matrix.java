@@ -20,7 +20,7 @@ import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
-public class Matrix {
+public class Matrix implements Solvable<Solution> {
   @Data
   @EqualsAndHashCode(of = "id")
   public static class Node {
@@ -182,12 +182,8 @@ public class Matrix {
     return getUncoveredPrimaryColumns().isEmpty();
   }
 
-  public List<Solver.Solution> solve(final Solver.ColumnSelector columnSelector, final boolean findOneSolution) {
-    return new Solver(this, columnSelector, findOneSolution).solve();
-  }
-
-  public List<Solver.Solution> solve() {
-    return solve(Solver.ColumnSelector.SMALLER, false);
+  public List<Solution> solve(final Solver.Options options) {
+    return new Solver(this, options).solve();
   }
 
   public String toString() {

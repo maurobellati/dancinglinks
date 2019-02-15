@@ -6,18 +6,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.google.common.base.Stopwatch;
 import dancinglinks.NQueen.Cell;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 public class NQueenTest {
 
   @Nested
   public class Size10 {
-    @RepeatedTest(5)
+    @Test
     public void findAll() {
       List<NQueen> actual = solve(new NQueen(10));
       actual.forEach(NQueenTest::prettyPrint);
@@ -44,14 +42,14 @@ public class NQueenTest {
 
   @Nested
   public class Size8 {
-    @RepeatedTest(5)
+    @Test
     public void findAll() {
       List<NQueen> actual = solve(new NQueen(8));
       actual.forEach(NQueenTest::prettyPrint);
       assertThat(actual).size().isEqualTo(92);
     }
 
-    @RepeatedTest(5)
+    @Test
     public void withOneCell() {
       List<NQueen> actual = solve(new NQueen(8,
                                              asList(new Cell(2, 2))));
@@ -61,6 +59,38 @@ public class NQueenTest {
 
   private static void prettyPrint(final NQueen solution) {
     System.out.println(solution.toPrettyString());
+  }
+
+  @Test
+  public void hasSolution_false() {
+    assertThat(parse("X...",
+                     "....",
+                     "....",
+                     "....").hasSolutions()).isFalse();
+  }
+
+  @Test
+  public void hasSolutions_true() {
+    assertThat(parse(".X..",
+                     "....",
+                     "....",
+                     "....").hasSolutions()).isTrue();
+  }
+
+  @Test
+  public void hasUniqueSolution_false() {
+    assertThat(parse("....",
+                     "....",
+                     "....",
+                     "....").hasUniqueSolution()).isFalse();
+  }
+
+  @Test
+  public void hasUniqueSolution_true() {
+    assertThat(parse(".X..",
+                     "....",
+                     "....",
+                     "....").hasUniqueSolution()).isTrue();
   }
 
   @Test
@@ -82,11 +112,6 @@ public class NQueenTest {
   }
 
   private List<NQueen> solve(final NQueen input) {
-    return solve(input, it -> {
-    });
-  }
-
-  private List<NQueen> solve(final NQueen input, final Consumer<NQueen> solutionConsumer) {
     System.out.printf("%nSolving: %s%n", input.toPrettyString());
 
     Stopwatch stopwatch = Stopwatch.createStarted();
@@ -94,7 +119,6 @@ public class NQueenTest {
     long ms = stopwatch.elapsed(TimeUnit.MILLISECONDS);
 
     System.out.printf("%nFound %d solutions in %s ms%n", solutions.size(), ms);
-    solutions.forEach(solutionConsumer);
     return solutions;
   }
 

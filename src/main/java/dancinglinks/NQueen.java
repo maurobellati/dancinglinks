@@ -29,7 +29,7 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 @EqualsAndHashCode(of = {"size", "existingValues"})
-public class NQueen {
+public class NQueen implements Solvable<NQueen> {
 
   @Value
   public static class Cell implements Comparable<Cell> {
@@ -179,7 +179,6 @@ public class NQueen {
       String[] rowColumn = input.split("\\.");
       return new Cell(parseInt(rowColumn[0]),
                       parseInt(rowColumn[1]));
-
     }
 
     private List<Cell> reachableFrom(final Cell input) {
@@ -245,14 +244,21 @@ public class NQueen {
     return new NQueen(size, existingValues);
   }
 
-  public List<NQueen> solve() {
+  @Override
+  public List<NQueen> solve(final Solver.Options options) {
     ConstraintsGenerator constraintsGenerator = new ConstraintsGenerator(size, existingValues);
-    List<String> constraints = constraintsGenerator.generate();
-    List<Solver.Solution> solutions = MatrixBuilder.withConstraintsLines(constraints).solve(Solver.ColumnSelector.FIRST, false);
 
-    return solutions.stream()
-                    .map(it -> fromSolution(it, constraintsGenerator::parseRowName))
-                    .collect(toList());
+    Function<Solution, NQueen> solutionParser = solution -> new NQueen(size,
+                                                                       solution.getRowNames()
+                                                                               .stream()
+                                                                               .map(constraintsGenerator::parseRowName)
+                                                                               .collect(toList()));
+
+    return MatrixBuilder.withConstraintsLines(constraintsGenerator.generate())
+                        .solve(options)
+                        .stream()
+                        .map(solutionParser)
+                        .collect(toList());
   }
 
   public Object toPrettyString() {
@@ -272,11 +278,7 @@ public class NQueen {
     return result.toString();
   }
 
-  private NQueen fromSolution(final Solver.Solution solution, final Function<String, Cell> parser) {
-    return new NQueen(size,
-                      solution.getRowNames()
-                              .stream()
-                              .map(parser)
-                              .collect(toList()));
-  }
 }
+
+
+

@@ -1,12 +1,14 @@
 package dancinglinks;
 
 import static com.google.common.collect.Lists.newArrayList;
+import static dancinglinks.Solver.Options.withLimit;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import dancinglinks.Matrix.Node;
-import dancinglinks.Solver.Solution;
+import dancinglinks.Solver.ColumnSelector;
+import dancinglinks.Solver.Options;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -170,9 +172,8 @@ public class MatrixTest {
 
     @Test
     public void solveFirst() {
-      List<Solution> solutions = matrix.solve(Solver.ColumnSelector.FIRST, false);
+      List<Solution> solutions = matrix.solve(Options.builder().columnSelector(ColumnSelector.FIRST).build());
       assertThat(solutions).size().isEqualTo(1);
-
       Solution actual = solutions.get(0);
       assertThat(actual.getCoveredColumnNames()).isEqualTo(asList(asList("A", "D"),
                                                                   asList("B", "G"),
@@ -181,9 +182,8 @@ public class MatrixTest {
 
     @Test
     public void solveSmaller() {
-      List<Solution> solutions = matrix.solve(Solver.ColumnSelector.SMALLER, false);
+      List<Solution> solutions = matrix.solve(Options.builder().columnSelector(ColumnSelector.SMALLER).build());
       assertThat(solutions).size().isEqualTo(1);
-
       Solution actual = solutions.get(0);
       assertThat(actual.getCoveredColumnNames()).isEqualTo(asList(asList("A", "D"),
                                                                   asList("E", "F", "C"),
@@ -195,19 +195,37 @@ public class MatrixTest {
   public class MultipleSolutions {
     private Matrix matrix;
 
+    @Test
+    public void hasSolutions() {
+      assertThat(matrix.hasSolutions()).isTrue();
+    }
+
+    @Test
+    public void hasUniqueSolution() {
+      assertThat(matrix.hasUniqueSolution()).isFalse();
+    }
+
     @BeforeEach
     public void init() {
       matrix = MatrixBuilder.fromBooleanMatrix(newArrayList("A B C D",
                                                             "0 1 0 1",
                                                             "1 0 1 0",
                                                             "1 0 0 1",
-                                                            "0 1 1 0"));
+                                                            "0 1 1 0",
+                                                            "1 1 0 0",
+                                                            "0 0 1 1"));
     }
 
     @Test
-    public void test() {
-      List<Solution> solutions = matrix.solve();
+    public void limit() {
+      List<Solution> solutions = matrix.solve(withLimit(2));
       assertThat(solutions).size().isEqualTo(2);
+    }
+
+    @Test
+    public void solve() {
+      List<Solution> solutions = matrix.solve();
+      assertThat(solutions).size().isEqualTo(3);
       assertThat(solutions).extracting(Solution::getCoveredColumnNames)
                            .containsAll(asList(asList(asList("A", "D"),
                                                       asList("B", "C")),
@@ -221,36 +239,8 @@ public class MatrixTest {
 
     @BeforeEach
     public void init() {
-      Matrix matrix = new Matrix(asList("A", "B"),
-                                 asList("C", "D"));
+      Matrix matrix = new Matrix(asList("A", "B"), asList("C", "D"));
     }
   }
 
-  @Nested
-  public class Sudoku2x2 {
-    private Matrix matrix;
-
-    @BeforeEach
-    public void init() {
-      matrix = MatrixBuilder.withConstraintsLines(
-        asList("X1.1 X1.2 X2.1 X2.2 R1#1 R1#2 R2#1 R2#2 C1#1 C1#2 C2#1 C2#2",
-               "r1c1#1: X1.1 R1#1 C1#1",
-               "r1c1#2: X1.1 R1#2 C1#2",
-               "r1c2#1: X1.2 R1#1 C2#1",
-               "r1c2#2: X1.2 R1#2 C2#2",
-               "r2c1#1: X2.1 R2#1 C1#1",
-               "r2c1#2: X2.1 R2#2 C1#2",
-               "r2c2#1: X2.2 R2#1 C2#1",
-               "r2c2#2: X2.2 R2#2 C2#2"));
-    }
-
-    @Test
-    public void solve() {
-      List<Solution> solutions = matrix.solve();
-      assertThat(solutions).size().isEqualTo(2);
-      assertThat(solutions).extracting(Solution::getRowNames)
-                           .containsAll(asList(asList("r1c1#1", "r1c2#2", "r2c1#2", "r2c2#1"),
-                                               asList("r1c1#2", "r1c2#1", "r2c1#1", "r2c2#2")));
-    }
-  }
 }
